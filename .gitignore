@@ -1,0 +1,14 @@
+# Ignorar arquivos .log
+*.log
+
+# Ignorar pasta de dependências
+node_modules/
+bin/
+venv/
+.buildozer/
+
+# Ignorar arquivos temporários
+*.tmp
+
+# Ignorar tudo dentro de /build
+build/
