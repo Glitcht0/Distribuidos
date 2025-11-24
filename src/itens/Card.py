@@ -5,7 +5,7 @@ from kivy.uix.behaviors import ButtonBehavior # Para tornar o layout clicável
 from kivy.graphics import Color, Rectangle
 from kivy.utils import get_color_from_hex
 from src.telas.chat import TelaChat
-
+from src.logical_clock import increment, update, get
 
 
 class IPCard(ButtonBehavior, BoxLayout):
@@ -17,6 +17,7 @@ class IPCard(ButtonBehavior, BoxLayout):
         self.padding = 15
         self.spacing = 5
         self.ip_address = ip_address
+        increment()
 
         self.Status = "Desconectado"  
         self.nome = "Desconhecido"
@@ -54,5 +55,6 @@ class IPCard(ButtonBehavior, BoxLayout):
     def on_press(self):
         # Ao abrir, passamos o IP mostrado no cartão para a tela de chat
         print(f"Abrindo detalhes do IP: {self.lbl_ip.text}")
+        increment()
         tela_detalhes = TelaChat(nome_ip=self.lbl_ip.text)
         tela_detalhes.open()

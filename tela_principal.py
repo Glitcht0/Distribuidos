@@ -10,16 +10,38 @@ from kivy.utils import get_color_from_hex
 from src.pop import AddIPPopup
 from src.itens.Card import IPCard
 from tinydb import TinyDB, Query
+from src.logical_clock import increment, update, get
+
+import socket
+
+def ip_valido(ip):
+    ip = ip.strip()               # remove espaços
+    partes = ip.split(".")
+
+    # precisa ter exatamente 4 partes
+    if len(partes) != 4:
+        return False
+
+    for p in partes:
+        if not p.isdigit():
+            return False
+        n = int(p)
+        if n < 0 or n > 255:
+            return False
+
+    return True
 
 
 
 class MainScreen(BoxLayout):
-    def __init__(self, **kwargs):
+    def __init__(self,app_reference, **kwargs):
+        self.app = app_reference
         # Chama o construtor da classe pai (BoxLayout)
         super().__init__(orientation='vertical', padding=[0, 0, 0, 0], spacing=10, **kwargs) # Define o layout vertical, com espaçamento e margens
 
         
-        self.db = TinyDB('superbanco.json')
+        self.db = TinyDB("superbanco.json").table("ips")
+
         
         self.logical_clock = 0
         self.ip_list = []
@@ -43,11 +65,14 @@ class MainScreen(BoxLayout):
         print(self.ip_list)
         popup = AddIPPopup(self)  # passa a tela principal pro popup
         popup.open()
+        increment()
+        print("Clock após abrir popup:", get())
 
 
     def carregar_ips_salvos(self):
         todos_ips = self.db.all()
         print(f"IPs carregados do banco: {todos_ips}")
+        increment()
 
         for item in todos_ips:
             self.adicionar_card_ip(item['ip'], salvar=False)
@@ -95,6 +120,9 @@ class MainScreen(BoxLayout):
 
     # Função chamada para adicionar um novo IP na interface visual
     def adicionar_card_ip(self, ip,salvar=True):
+        if not ip_valido(ip):
+            print(f"ERRO: IP inválido bloqueado: {ip}")
+            return
 
         novo_card = IPCard(ip_address=ip)
         self.lista_ips_layout.add_widget(novo_card)
@@ -108,9 +136,6 @@ class MainScreen(BoxLayout):
 
 
 
-    def open_add_ip_popup(self, *args):
-        popup = AddIPPopup(self)
-        popup.open()
 
     def update_header(self, *args):
         self.header_rect.size = self.header.size

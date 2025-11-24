@@ -12,7 +12,8 @@ from kivy.core.window import Window
 from kivy.clock import Clock
 from kivy.uix.textinput import TextInput
 from kivy.utils import get_color_from_hex
-
+from src.logical_clock import increment, update, get
+from src.network import send_message
 
 class TelaChat(ModalView):
     def __init__(self, nome_ip = "desconhecido", **kwargs):
@@ -20,6 +21,7 @@ class TelaChat(ModalView):
         self.size_hint = (1, 1)  # Cobre 100% da tela
         self.auto_dismiss = False # Obriga a clicar no botão voltar para sair
         self.background_color = (0, 0, 0, 0) # Tira o fundo padrão cinza do modal
+        increment()
 
         self.nome_ip = nome_ip
         self.layout = BoxLayout(orientation='vertical') # Layout Principal da Tela
@@ -114,23 +116,33 @@ class TelaChat(ModalView):
         if texto == "":
             return
 
-        # Salva no banco
+        # Incrementa relógio lógico e obtém valor antes de salvar
+        increment()
+        tempo = get()
+        status = "sending"
+
+        # Salva no banco incluindo o clock lógico
         messages_table = self.db.table('messages')
         messages_table.insert({
             'chat': self.nome_ip,
             'sender': 'me',
             'text': texto,
-            'timestamp': Clock.get_time()
+            'timestamp': Clock.get_time(),
+            'status': status,
+            'clock': tempo
         })
 
         self.txt_msg.text = ""  # limpa o campo
+        print("Clock:", tempo)
 
-        
-        self.display_message(texto, sender="me") # Atualiza visualmente
+        # Atualiza visualmente
+        self.display_message(texto, sender="me", clock=tempo, status=status)
 
         # Scroll automático para última mensagem
         Clock.schedule_once(lambda dt: setattr(
             self.messages_scroll, 'scroll_y', 0), 0.1)
+        
+        send_message(self.nome_ip, 5000, texto)
 
 
 
@@ -159,7 +171,11 @@ class TelaChat(ModalView):
         for m in msgs:
             sender = m.get('sender', '')
             text = m.get('text', '')
-            self.display_message(text, sender=sender) # Mostra o texto e passa o sender separado para alinhamento
+            status = m.get('status', '')
+            # tenta carregar o clock lógico; se não existir, usa timestamp como fallback
+            clock = m.get('clock', m.get('timestamp', ''))
+
+            self.display_message(text, sender=sender, clock=clock, status=status) # Mostra o texto e passa o sender separado para alinhamento
 
         Clock.schedule_once(lambda dt: setattr(self.messages_scroll, 'scroll_y', 0), 0.1)
 
@@ -169,7 +185,7 @@ class TelaChat(ModalView):
 
 
 
-    def display_message(self, text, sender=None):
+    def display_message(self, text, clock, status, sender=None):
         is_me = False
         if sender:
             is_me = str(sender).lower() in ('me', 'eu', 'local')
@@ -224,6 +240,7 @@ class TelaChat(ModalView):
 
         # --- Status (✓) ---
         status_text = "1" if is_me else "0"
+        status_text = status_text + "   clock: " + str(clock)
         status_lbl = Label(
             text=status_text,
             size_hint=(1, None),
@@ -249,7 +266,7 @@ class TelaChat(ModalView):
             container.add_widget(spacer)
 
         self.messages_layout.add_widget(container)
-
+        increment()
         # Salva para reflow
         self._bubble_items.append({'bubble': bubble, 'lbl': lbl, 'container': container})
 
