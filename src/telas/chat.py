@@ -115,34 +115,60 @@ class TelaChat(ModalView):
         texto = self.txt_msg.text.strip()
         if texto == "":
             return
-
         # Incrementa relógio lógico e obtém valor antes de salvar
         increment()
         tempo = get()
         status = "sending"
 
-        # Salva no banco incluindo o clock lógico
-        messages_table = self.db.table('messages')
-        messages_table.insert({
-            'chat': self.nome_ip,
-            'sender': 'me',
-            'text': texto,
-            'timestamp': Clock.get_time(),
-            'status': status,
-            'clock': tempo
-        })
+        # Salva no banco incluindo o clock lógico (usa nova instância para evitar cache)
+        try:
+            _db = TinyDB('superbanco.json')
+            messages_table = _db.table('messages')
+            messages_table.insert({
+                'chat': self.nome_ip,
+                'sender': 'me',
+                'text': texto,
+                'timestamp': Clock.get_time(),
+                'status': status,
+                'clock': tempo
+            })
+            _db.close()
+        except Exception:
+            pass
 
-        self.txt_msg.text = ""  # limpa o campo
+        # Limpa o campo de entrada
+        self.txt_msg.text = ""
         print("Clock:", tempo)
 
-        # Atualiza visualmente
-        self.display_message(texto, sender="me", clock=tempo, status=status)
+        # Atualiza visualmente (usa keywords para evitar ordem de parâmetros)
+        self.display_message(texto, clock=tempo, status=status, sender="me")
 
-        # Scroll automático para última mensagem
-        Clock.schedule_once(lambda dt: setattr(
-            self.messages_scroll, 'scroll_y', 0), 0.1)
-        
-        send_message(self.nome_ip, 5000, texto)
+        # Recarrega mensagens (vai ordenar por clock) e faz auto-scroll
+        try:
+            self.carregar_mensagens()
+        except Exception:
+            pass
+        Clock.schedule_once(lambda dt: setattr(self.messages_scroll, 'scroll_y', 0), 0.1)
+
+        # Envia pela rede
+        try:
+            send_message(self.nome_ip, 5397, texto)
+        except Exception:
+            pass
+
+
+
+
+    def receber_mensagem(self, text, clock):
+        print(f"Recebendo mensagem na tela de chat {self.nome_ip}: {text} (clock={clock})")
+        try:
+           
+            self.carregar_mensagens()  # reload from disk: carregar_mensagens will open a fresh TinyDB instance
+        except Exception:
+            self.display_message(text, sender='them', clock=clock, status='received') # fallback: caso algo dê errado, pelo menos exibimos a mensagem
+
+        # scroll automático para a última mensagem
+        Clock.schedule_once(lambda dt: setattr(self.messages_scroll, 'scroll_y', 0), 0.1)
 
 
 
@@ -154,7 +180,13 @@ class TelaChat(ModalView):
         if not hasattr(self, 'db') or self.db is None:
             return
 
-        messages_table = self.db.table('messages')
+        # Abre uma nova instância do TinyDB para garantir que vemos as
+        # gravações feitas por outras threads (evita cache de instância).
+        try:
+            _db = TinyDB('superbanco.json')
+            messages_table = _db.table('messages')
+        except Exception:
+            return
         q = Query()
         # Suporta algumas chaves possíveis para pesquisar (dependendo de como você editou o JSON)
         try:
@@ -163,8 +195,9 @@ class TelaChat(ModalView):
             msgs = []
 
         
-        try: 
-            msgs = sorted(msgs, key=lambda m: m.get('timestamp', 0)) # Ordena por timestamp se disponível
+        try:
+            # Ordena por relógio lógico ('clock') primeiro, depois por timestamp como tie-breaker
+            msgs = sorted(msgs, key=lambda m: (m.get('clock', m.get('timestamp', 0)), m.get('timestamp', 0)))
         except Exception:
             pass
 
@@ -174,8 +207,13 @@ class TelaChat(ModalView):
             status = m.get('status', '')
             # tenta carregar o clock lógico; se não existir, usa timestamp como fallback
             clock = m.get('clock', m.get('timestamp', ''))
-
             self.display_message(text, sender=sender, clock=clock, status=status) # Mostra o texto e passa o sender separado para alinhamento
+
+        # fecha DB e faz scroll
+        try:
+            _db.close()
+        except Exception:
+            pass
 
         Clock.schedule_once(lambda dt: setattr(self.messages_scroll, 'scroll_y', 0), 0.1)
 
@@ -239,7 +277,7 @@ class TelaChat(ModalView):
         bubble.add_widget(lbl)
 
         # --- Status (✓) ---
-        status_text = "1" if is_me else "0"
+        status_text = status
         status_text = status_text + "   clock: " + str(clock)
         status_lbl = Label(
             text=status_text,
@@ -285,9 +323,6 @@ class TelaChat(ModalView):
         bubble.height = max(36, th + pad_y + 15)  # 15 = status
 
         container.height = bubble.height + 10
-
-
-
 
 
 

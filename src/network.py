@@ -1,13 +1,13 @@
 import socket
 import threading
 from kivy.clock import Clock
-from src.logical_clock import update
+from src.logical_clock import update, get
 from tinydb import TinyDB
-
+from tinydb import TinyDB
 
 class MessageServer:
 
-    def __init__(self, app_reference, port=5397):
+    def __init__(self, app_reference, port=5000):
         """
         app_reference → referência para o aplicativo principal.
         Isso permite que o servidor avise a UI quando receber mensagens.
@@ -17,37 +17,20 @@ class MessageServer:
 
         self.app = app_reference
         self.port = port
-
-        # Abre (ou cria) a tabela "messages" dentro do superbanco.json
-        self.db = TinyDB("superbanco.json").table("messages")
+        
+        self.db = TinyDB("superbanco.json").table("messages") # Abre (ou cria) a tabela "messages" dentro do superbanco.json
 
 
     def start(self):
-        """
-        Inicia o servidor em uma thread separada.
-
-        IMPORTANTE:
-        - Threads são necessárias porque o servidor não pode travar a UI.
-        - daemon=True faz a thread fechar automaticamente quando o app fechar.
-        """
-
         thread = threading.Thread(target=self.listen, daemon=True)
         thread.start()
 
 
     def listen(self):
-        """
-        Loop infinito que fica ouvindo mensagens UDP de qualquer dispositivo na rede.
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Cria o socket UDP
 
-        Cada celular roda um servidor desses, assim todos podem enviar mensagens
-        diretamente uns para os outros.
-        """
-
-        # Cria o socket UDP
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-        # Escuta em todas interfaces (0.0.0.0) e na porta definida
-        sock.bind(("0.0.0.0", self.port))
+       
+        sock.bind(("0.0.0.0", self.port))  # Escuta em todas interfaces (0.0.0.0) e na porta definida
 
         print(f"[SERVIDOR] Ouvindo na porta {self.port}...")
 
@@ -55,12 +38,12 @@ class MessageServer:
         # Loop eterno: sempre ouvindo mensagens
         while True:
 
-            # Espera uma mensagem (bloqueante, mas não trava a UI pois está em uma thread)
-            data, addr = sock.recvfrom(4096)
+            
+            data, addr = sock.recvfrom(4096) # Espera uma mensagem (bloqueante, mas não trava a UI pois está em uma thread)
 
             text = data.decode()   # Decodifica de bytes para string
             ip = addr[0]           # Endereço IP do remetente
-
+            
 
             # ------------------------------------------------------------------
             # Formato esperado da mensagem: "clock|texto"
@@ -76,27 +59,28 @@ class MessageServer:
                 recv_clock = 0
                 msg = text
 
+            antigo = get()
 
-            # ------------------------------------------------------------------
-            # Atualiza o relógio lógico local
-            # usando o relógio recebido:
-            #
-            #   clock = max(local, recebido) + 1
-            #
-            # Isso garante ordenação de Lamport
-            # ------------------------------------------------------------------
             local_clock = update(recv_clock)
 
+            novo = get()
+            # Exemplo de uso
+            print(f"\n\n{"\033[96m"}---- [SERVIDOR] Mensagem recebida de {ip}: {text} ----{"\033[0m"}")
+            print(f"{"\033[93m"}clock recebido: {recv_clock}, clock local atualizado: {novo} e antigo: {antigo}{"\033[0m"}")
 
-            # ------------------------------------------------------------------
-            # Salva a mensagem no banco
-            # ------------------------------------------------------------------
-            self.db.insert({
-                "chat": ip,          # identifica a conversa pelo IP do outro lado
-                "sender": "remote",  # mensagem recebida
+
+            
+            local_db = TinyDB("superbanco.json").table("messages")
+
+            local_db.insert({
+                "chat": ip,
+                "sender": "remote",
                 "text": msg,
+                "status": "received",
                 "clock": local_clock
             })
+            
+
 
 
             # ------------------------------------------------------------------

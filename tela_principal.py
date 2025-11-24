@@ -115,6 +115,24 @@ class MainScreen(BoxLayout):
         self.scroll_view.add_widget(self.lista_ips_layout)
         self.add_widget(self.scroll_view)
 
+    def route_message(self, ip, text, clock):
+        """
+        Quando chegar uma mensagem, decide para qual tela enviar.
+        """
+        # Se o chat já está aberto e é o mesmo IP → envia direto
+        if hasattr(self, "chat_screen") and self.chat_screen.nome_ip == ip:
+            self.chat_screen.receber_mensagem(text, clock)
+            return
+
+        # Se não, cria e abre a tela de chat
+        from src.telas.chat import TelaChat
+
+
+        self.chat_screen = TelaChat(ip)
+        self.chat_screen.receber_mensagem(text, clock)
+
+        # Trocar para tela do chat (caso use ScreenManager)
+        # self.manager.current = "chat"
 
 
 
@@ -128,9 +146,10 @@ class MainScreen(BoxLayout):
         self.lista_ips_layout.add_widget(novo_card)
 
         if salvar:
-            # Salva no banco de dados
+            # Salva no banco de dados (tabela correta: "ips")
             self.db.insert({'ip': ip})
             print(f"IP Salvo no banco: {ip}")
+            
 
 
 

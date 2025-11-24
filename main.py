@@ -1,7 +1,9 @@
 from tela_principal import MainScreen
 
 from src.logical_clock import increment, update, get
+from src.telas.chat import TelaChat
 
+from kivy.utils import platform
 
 from kivy.app import App
 from kivy.core.window import Window
@@ -22,29 +24,29 @@ class LogicalClockApp(App):
         return self.main
 
     def on_new_message(self, ip, text, clock):
-        """
-        Esse método é chamado sempre que o servidor UDP
-        recebe uma mensagem de algum outro dispositivo.
-        
-        Ele apenas repassa o evento para a tela principal.
-        """
-        self.main.route_message(ip, text, clock)
+        # Procura tela que já está aberta para esse IP
+        for screen in self.root_window.children:
+            if isinstance(screen, TelaChat) and screen.nome_ip == ip:
+                screen.receber_mensagem(text, clock)
+                return
+
+        print(f"[AVISO] Recebi mensagem de {ip}, mas nenhuma TelaChat está aberta.")
+
 
 
 
 
 
 def main():
-    print("Software Cliente Servidor de mensagens")
+    print(f"{"\033[96m"} Software Cliente Servidor de mensagens{"\033[0m"}")
+
     print("Clock atual =", get())
 
 
     # Define tamanho da janela padrão para formato de celular (facilita testes em desktop)
     # Exemplo: 360x800 (largura x altura) — ajuste conforme desejar
-    try:
+    if platform == 'win' or platform == 'linux' or platform == 'macosx':
         Window.size = (360, 800)
-    except Exception:
-        pass
 
     LogicalClockApp().run() 
 
