@@ -7,9 +7,10 @@ from kivy.uix.gridlayout import GridLayout  # Importante para organizar a lista
 from kivy.uix.behaviors import ButtonBehavior # Para tornar o layout clicável
 from kivy.graphics import Color, Rectangle
 from kivy.utils import get_color_from_hex
-from src.pop import AddIPPopup
+from src.pop import AddIPPopup, AddConnectionPopup
 from src.itens.Card import IPCard
 from tinydb import TinyDB, Query
+from kivy.clock import Clock
 from src.logical_clock import increment, update, get
 
 import socket
@@ -40,14 +41,15 @@ class MainScreen(BoxLayout):
         super().__init__(orientation='vertical', padding=[0, 0, 0, 0], spacing=10, **kwargs) # Define o layout vertical, com espaçamento e margens
 
         
-        self.db = TinyDB("superbanco.json").table("ips")
-
+        self.ips_db = TinyDB("superbanco.json").table("ips")
+        self.config_db = TinyDB("superbanco.json").table("config")
         
         self.logical_clock = 0
         self.ip_list = []
 
         self.elementos_Ui()
         self.carregar_ips_salvos()
+        Clock.schedule_once(lambda dt: self.verificar_configuracao(), 0)
         
 
         
@@ -58,7 +60,17 @@ class MainScreen(BoxLayout):
 
 
     
-
+    def verificar_configuracao(self):
+        config = self.config_db.get(doc_id=1)
+        print(config)
+        if not config:
+            print("Nenhuma configuração de portas encontrada. Abrindo popup...")
+            popup = AddConnectionPopup(self)
+            popup.open()
+        else:
+            print("Configuração de portas carregada:", config)
+            self.porta_out = config["porta_out"]
+            self.porta_in = config["porta_in"]
 
 
     def open_add_ip_popup(self, *args):
@@ -70,7 +82,7 @@ class MainScreen(BoxLayout):
 
 
     def carregar_ips_salvos(self):
-        todos_ips = self.db.all()
+        todos_ips = self.ips_db.all()
         print(f"IPs carregados do banco: {todos_ips}")
         increment()
 
@@ -147,7 +159,7 @@ class MainScreen(BoxLayout):
 
         if salvar:
             # Salva no banco de dados (tabela correta: "ips")
-            self.db.insert({'ip': ip})
+            self.ips_db.insert({'ip': ip})
             print(f"IP Salvo no banco: {ip}")
             
 

@@ -16,7 +16,22 @@ class MessageServer:
         """
 
         self.app = app_reference
-        self.port = port
+        try:
+            # Abre o banco apenas para ler a config 
+            with TinyDB("superbanco.json") as db:
+                config_table = db.table("config")
+                config = config_table.get(doc_id=1)
+
+                if config and 'porta_in' in config:
+                    self.port = int(config['porta_in'])
+                    print(f"Servidor: Porta {self.port} carregada.")
+                else:
+                    self.port = 5000
+                    print("Servidor: Porta padrão 5000 (config não encontrada).")
+
+        except Exception as e:
+            print(f"Erro ao ler config: {e}")
+            self.port = 5000
         
         self.db = TinyDB("superbanco.json").table("messages") # Abre (ou cria) a tabela "messages" dentro do superbanco.json
 

@@ -26,8 +26,25 @@ class TelaChat(ModalView):
         self.nome_ip = nome_ip
         self.layout = BoxLayout(orientation='vertical') # Layout Principal da Tela
         
-
+        
         header = BoxLayout(size_hint_y=None, height=60, padding=10)
+
+        try:
+            # Abre o banco apenas para ler a config
+            with TinyDB("superbanco.json") as db:
+                config_table = db.table("config")
+                config = config_table.get(doc_id=1)
+
+                if config and 'porta_out' in config:
+                    self.porta_send = int(config['porta_out'])
+                    print(f"Servidor: Porta {self.port} carregada.")
+                else:
+                    self.porta_send = 5001
+                    print("Servidor: Porta padrão 5000 (config não encontrada).")
+
+        except Exception as e:
+            print(f"Erro ao ler config: {e}")
+            self.port = 5000
         
         # Fundo do Header
         with header.canvas.before:
@@ -138,7 +155,7 @@ class TelaChat(ModalView):
 
         # Limpa o campo de entrada
         self.txt_msg.text = ""
-        print("Clock:", tempo)
+        #print("Clock:", tempo)
 
         # Atualiza visualmente (usa keywords para evitar ordem de parâmetros)
         self.display_message(texto, clock=tempo, status=status, sender="me")
@@ -152,7 +169,7 @@ class TelaChat(ModalView):
 
         # Envia pela rede
         try:
-            send_message(self.nome_ip, 5397, texto)
+            send_message(self.nome_ip, self.porta_send, texto)
         except Exception:
             pass
 
